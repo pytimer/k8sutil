@@ -1,4 +1,4 @@
-package pod
+package podutil
 
 import (
 	"context"
@@ -206,4 +206,22 @@ func isPodRunning(ctx context.Context, c kubernetes.Interface, namespace, name, 
 
 func WaitForPodRunning(ctx context.Context, c kubernetes.Interface, namespace, name, resourceVersion string, timeout time.Duration) error {
 	return wait.PollImmediate(time.Second, timeout, isPodRunning(ctx, c, namespace, name, resourceVersion))
+}
+
+func GetPodImages(spec corev1.PodSpec) []string {
+	images := make([]string, 0, len(spec.Containers))
+	for _, c := range spec.Containers {
+		images = append(images, c.Image)
+	}
+	return images
+}
+
+func GetPodReadyContainers(pod *corev1.Pod) []string {
+	containers := make([]string, 0)
+	for _, cs := range pod.Status.ContainerStatuses {
+		if cs.Ready {
+			containers = append(containers, cs.Name)
+		}
+	}
+	return containers
 }
