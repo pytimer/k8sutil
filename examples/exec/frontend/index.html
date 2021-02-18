@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="xterm.js/dist/xterm.css">
+    <script src="xterm.js/dist/xterm.js"></script>
+    <script src="xterm.js/dist/addons/fit/fit.js"></script>
+    <meta charset="UTF-8">
+    <title>test</title>
+</head>
+<body>
+<div id="terminal"></div>
+<script>
+	window.onload = function() {
+		Terminal.applyAddon(fit);
+        url = "ws://127.0.0.1:8080/exec?namespace=default&pod=demo-67d69c94f7-z9fn7&container=demo&shell=/bin/bash"
+        console.log("ws");
+
+		var term = new Terminal({
+			cursorBlink: true,
+			termName: "xterm",
+			useStyle: true,
+			colors: Terminal.xtermColors,
+			cols: Math.floor(1000 - 20 / 8.39),
+			rows: 20
+		});
+
+		term.open(document.getElementById('#terminal'), true);
+		term.writeln("connecting to pod...")
+		term.fit();
+
+		term.on('data', function(data){
+			d = {
+				op: "stdin",
+				data: data
+			}
+			console.log(data);
+			socket.send(JSON.stringify(d));
+		})
+
+		// cols:宽 rows:高
+		term.on('resize', function (size) {
+			console.log("resize: " + size.cols, size.rows)
+			msg = {op: "resize", cols: size.cols, rows: size.rows}
+			socket.send(JSON.stringify(msg))
+		});
+
+		var socket = new WebSocket(url);
+
+		// 打开socket
+        socket.onopen = function(evt) {
+            console.log("open");
+			// 发送初始化消息
+			msg = {op: "stdin", data: "export TERM=xterm && clear \r"}
+			socket.send(JSON.stringify(msg))
+        }
+
+		// 监听消息
+		socket.onmessage =  function(e){
+			console.log("message", e.data);
+			msg = JSON.parse(e.data)
+			if (msg.op == "stdout") {
+				term.write(msg.data);
+			} else {
+			    term.write(msg);
+				console.log("invalid msg operation: "+msg)
+			}
+		}
+
+		socket.onclose = function(e) {
+			console.log(e.wasClean);
+			if (e.wasClean) {
+				console.log('[close] Connection closed cleanly')
+			} else {
+				console.log('[close] Connection died')
+				term.writeln("");
+			}
+			term.writeln("Connection Reset By Peer! Try Refresh.")
+			//socket.close();
+		};
+
+		socket.onerror = function (error) {
+			console.log("received error close message");
+			term.write("error: "+error.message);
+			term.clear();
+		};
+	};
+</script>
+</body>
+</html>

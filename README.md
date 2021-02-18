@@ -21,3 +21,9 @@ This feature support view the workload resource revision history. It's like `kub
 Now only support `Deployment`.
 
 The example code in [history](./examples/history).
+
+### Exec in http
+
+This package support create the container putty console shell when use http.
+
+The example code in [exec](./examples/exec).
