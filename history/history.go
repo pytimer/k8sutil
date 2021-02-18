@@ -25,7 +25,7 @@ type DeploymentViewer struct {
 	c kubernetes.Interface
 }
 
-func (h *DeploymentViewer) ViewHistory(namespace, name string, revision int64) ([]*RevisionHistory, []*RevisionHistory, error) {
+func (h *DeploymentViewer) ViewHistory(namespace, name string) ([]*RevisionHistory, []*RevisionHistory, error) {
 	appsClient := h.c.AppsV1()
 	deployment, err := appsClient.Deployments(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
@@ -184,7 +184,7 @@ type StatefulSetViewer struct {
 	c kubernetes.Interface
 }
 
-func (h *StatefulSetViewer) ViewHistory(namespace, name string, revision int64) ([]*RevisionHistory, []*RevisionHistory, error) {
+func (h *StatefulSetViewer) ViewHistory(namespace, name string) ([]*RevisionHistory, []*RevisionHistory, error) {
 	return nil, nil, fmt.Errorf("not implement")
 }
 
@@ -192,6 +192,6 @@ type DaemonsetViewer struct {
 	c kubernetes.Interface
 }
 
-func (h *DaemonsetViewer) ViewHistory(namespace, name string, revision int64) ([]*RevisionHistory, []*RevisionHistory, error) {
+func (h *DaemonsetViewer) ViewHistory(namespace, name string) ([]*RevisionHistory, []*RevisionHistory, error) {
 	return nil, nil, fmt.Errorf("not implement")
 }

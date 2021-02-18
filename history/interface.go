@@ -7,7 +7,7 @@ import (
 )
 
 type Viewer interface {
-	ViewHistory(namespace, name string, revision int64) ([]*RevisionHistory, []*RevisionHistory, error)
+	ViewHistory(namespace, name string) ([]*RevisionHistory, []*RevisionHistory, error)
 }
 
 func ViewerFor(c kubernetes.Interface, kind schema.GroupKind) Viewer {
