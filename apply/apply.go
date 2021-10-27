@@ -91,7 +91,7 @@ func Decode(data []byte) ([]unstructured.Unstructured, error) {
 		if err = decoder.Decode(&reqObj); err != nil {
 			break
 		}
-		klog.V(5).Info("The section:[%d] raw content: %s", i, string(reqObj.Raw))
+		klog.V(5).Infof("The section:[%d] raw content: %s", i, string(reqObj.Raw))
 
 		obj, gvk, err := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme).Decode(reqObj.Raw, nil, nil)
 		if err != nil {
@@ -222,7 +222,7 @@ func Patch(currentUnstr *unstructured.Unstructured, modified []byte, name string
 	var patchType types.PatchType
 	var patch []byte
 
-	versionedObject, err := runtime.NewScheme().New(gvk)
+	versionedObject, err := Scheme.New(gvk)
 	switch {
 	case runtime.IsNotRegisteredError(err):
 		patchType = types.MergePatchType

@@ -8,6 +8,8 @@ import (
 
 	"github.com/pytimer/k8sutil/apply"
 
+	// imagepolicyv1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
+	// utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
@@ -72,6 +74,8 @@ func main() {
 		panic(err.Error())
 	}
 
+	// You can add other(crd/build-in) resource scheme
+	// utilruntime.Must(imagepolicyv1alpha1.AddToScheme(apply.Scheme))
 	applyOptions := apply.NewApplyOptions(dynamicClient, discoveryClient)
 	if err := applyOptions.Apply(context.TODO(), []byte(applyStr)); err != nil {
 		log.Fatalf("apply error: %v", err)
