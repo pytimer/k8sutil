@@ -4,17 +4,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/pytimer/k8sutil/wsremotecommand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/klog/v2"
 )
 
+type ExecutorType string
+
 const (
 	// EndOfTransmission end
 	EndOfTransmission = "\u0004"
+
+	WebsocketExecutorType ExecutorType = "websocket"
+	SPDYExecutorType      ExecutorType = "spdy"
 )
 
 var upgrader = websocket.Upgrader{
@@ -24,18 +31,30 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+type ExecOptions struct {
+	Stdin    bool
+	Stdout   bool
+	Stderr   bool
+	TTY      bool
+	Executor ExecutorType
+}
+
 type TerminalSession struct {
 	wsConn   *websocket.Conn
 	sizeChan chan remotecommand.TerminalSize
 	doneChan chan struct{}
 	client   kubernetes.Interface
+	once     sync.Once
 }
 
 func NewTerminalSession(c kubernetes.Interface, w http.ResponseWriter, r *http.Request, responseHeader http.Header) (*TerminalSession, error) {
+	subprotocols := websocket.Subprotocols(r)
 	conn, err := upgrader.Upgrade(w, r, responseHeader)
 	if err != nil {
 		return nil, err
 	}
+	upgrader.Subprotocols = subprotocols
+
 	return &TerminalSession{
 		wsConn:   conn,
 		sizeChan: make(chan remotecommand.TerminalSize),
@@ -49,7 +68,19 @@ func (t *TerminalSession) Close() error {
 }
 
 func (t *TerminalSession) Done() {
-	close(t.doneChan)
+	t.once.Do(func() {
+		close(t.doneChan)
+	})
+}
+
+// watchAndCloseRemoteExecutor close container websocket process when TerminalSession have done.
+func (t *TerminalSession) watchAndCloseRemoteExecutor(executor *wsremotecommand.Executor) {
+	klog.V(5).Info("listen terminal session stream.")
+	select {
+	case <-t.doneChan:
+		klog.V(5).Info("executor closing...")
+		klog.V(5).Info(executor.Close())
+	}
 }
 
 func (t *TerminalSession) Read(p []byte) (n int, err error) {

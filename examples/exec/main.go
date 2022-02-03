@@ -56,7 +56,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer ts.Close()
 
-	if err := ts.Exec(config, namespace, podName, containerName, []string{cmd}); err != nil {
+	if err := ts.Exec(config, namespace, podName, containerName, []string{cmd}, &terminal.ExecOptions{
+		Stdin:  true,
+		Stdout: true,
+		Stderr: true,
+		TTY:    true,
+	}); err != nil {
 		log.Printf("unable to execute stream in container, %v", err)
 		ts.Done()
 		return

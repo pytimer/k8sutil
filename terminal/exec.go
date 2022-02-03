@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pytimer/k8sutil/wsremotecommand"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,7 +43,7 @@ func ValidatePod(ctx context.Context, client kubernetes.Interface, namespace, po
 	return fmt.Errorf("pod has no container %s", containerName)
 }
 
-func (t *TerminalSession) Exec(config *rest.Config, namespace, podName, containerName string, cmd []string) error {
+func (t *TerminalSession) Exec(config *rest.Config, namespace, podName, containerName string, cmd []string, opts *ExecOptions) error {
 	req := t.client.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(podName).
@@ -52,11 +53,21 @@ func (t *TerminalSession) Exec(config *rest.Config, namespace, podName, containe
 	req.VersionedParams(&corev1.PodExecOptions{
 		Container: containerName,
 		Command:   cmd,
-		Stdin:     true,
-		Stdout:    true,
-		Stderr:    true,
-		TTY:       true,
+		Stdin:     opts.Stdin,
+		Stdout:    opts.Stdout,
+		Stderr:    opts.Stderr,
+		TTY:       opts.TTY,
 	}, scheme.ParameterCodec)
+
+	if opts.TTY && (opts.Executor == WebsocketExecutorType || opts.Executor == "") {
+		executor, err := wsremotecommand.NewWebSocketExecutor(config, req.URL(), []string{t.wsConn.Subprotocol()})
+		if err != nil {
+			return err
+		}
+		return executor.Stream(wsremotecommand.StreamOptions{
+			Stdin: t.wsConn,
+		})
+	}
 
 	executor, err := remotecommand.NewSPDYExecutor(config, "POST", req.URL())
 	if err != nil {
