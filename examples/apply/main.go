@@ -48,6 +48,9 @@ spec:
   selector:
     app: nginx
   type: ClusterIP
+---
+# abc
+# demo
 `
 
 func main() {

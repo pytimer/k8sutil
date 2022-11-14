@@ -10,8 +10,9 @@ import (
 
 	"github.com/pytimer/k8sutil/util"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -81,36 +82,41 @@ func (o *applyOptions) Apply(ctx context.Context, data []byte) error {
 }
 
 func Decode(data []byte) ([]unstructured.Unstructured, error) {
-	var err error
+	var lastErr error
 	var unstructList []unstructured.Unstructured
 	i := 1
 
 	decoder := yamlutil.NewYAMLOrJSONDecoder(bytes.NewReader(data), DefaultDecoderBufferSize)
 	for {
 		var reqObj runtime.RawExtension
-		if err = decoder.Decode(&reqObj); err != nil {
+		if err := decoder.Decode(&reqObj); err != nil {
+			lastErr = err
 			break
 		}
 		klog.V(5).Infof("The section:[%d] raw content: %s", i, string(reqObj.Raw))
+		if len(reqObj.Raw) == 0 {
+			continue
+		}
 
 		obj, gvk, err := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme).Decode(reqObj.Raw, nil, nil)
 		if err != nil {
-			err = fmt.Errorf("serialize the section:[%d] content error, %v", i, err)
+			lastErr = errors.Wrapf(err, "serialize the section:[%d] content error", i)
+			klog.Info(lastErr)
 			break
 		}
 		klog.V(5).Infof("The section:[%d] GroupVersionKind: %#v  object: %#v", i, gvk, obj)
 
 		unstruct, err := util.ConvertSingleObjectToUnstructured(obj)
 		if err != nil {
-			err = fmt.Errorf("serialize the section:[%d] content error, %v", i, err)
+			lastErr = errors.Wrapf(err, "serialize the section:[%d] content error", i)
 			break
 		}
 		unstructList = append(unstructList, unstruct)
 		i++
 	}
 
-	if err != io.EOF {
-		return unstructList, fmt.Errorf("parsing the section:[%d] content error, %v", i, err)
+	if lastErr != io.EOF {
+		return unstructList, errors.Wrapf(lastErr, "parsing the section:[%d] content error", i)
 	}
 
 	return unstructList, nil
@@ -180,7 +186,7 @@ func ApplyUnstructured(ctx context.Context, dynamicClient dynamic.Interface, res
 
 	currentUnstr, err := dri.Get(ctx, unstructuredObj.GetName(), metav1.GetOptions{})
 	if err != nil {
-		if !errors.IsNotFound(err) {
+		if !apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("retrieving current configuration of:\n%s\nfrom server for:%v", unstructuredObj.GetName(), err)
 		}
 
@@ -280,9 +286,9 @@ func ObjectToUnstructured(obj runtime.Object) ([]unstructured.Unstructured, erro
 }
 
 func isIncompatibleServerError(err error) bool {
-	if _, ok := err.(*errors.StatusError); !ok {
+	if _, ok := err.(*apierrors.StatusError); !ok {
 		return false
 	}
 	// 415 说明服务端不支持server-side-apply
-	return err.(*errors.StatusError).Status().Code == http.StatusUnsupportedMediaType
+	return err.(*apierrors.StatusError).Status().Code == http.StatusUnsupportedMediaType
 }
